@@ -1,6 +1,7 @@
 from app.models import code
 from pathlib import Path
 import subprocess
+import shutil
 from urllib.parse import urlparse
 
 class GitHubRepositoryLoader:
@@ -48,4 +49,7 @@ class GitHubRepositoryLoader:
                     
         return target_dir.resolve()
         
-       
+    def cleanup(self, repo_path: Path):
+        if repo_path.exists():
+            shutil.rmtree(repo_path)
+            print(f"Cleaned up repository: {repo_path}")

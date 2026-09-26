@@ -26,74 +26,78 @@ class RepositoryReviewService:
             github_url
         )
 
-        # 2. Scan repository
-        scanner = RepositoryScanner()
+        try:
+            # 2. Scan repository
+            scanner = RepositoryScanner()
 
-        files = scanner.scan(repo_path)
+            files = scanner.scan(repo_path)
 
-        print("Code files found:", len(files))
+            print("Code files found:", len(files))
 
-        # 3. Load all code files
-        code_files = []
+            # 3. Load all code files
+            code_files = []
 
-        for file in files:
+            for file in files:
 
-            code_file = code_loader.load_code(file)
+                code_file = code_loader.load_code(file)
 
-            code_files.append(code_file)
+                code_files.append(code_file)
 
-        print("CodeFiles loaded:", len(code_files))
+            print("CodeFiles loaded:", len(code_files))
 
-        # 4. Chunk all code
-        chunker = CodeChunker()
+            # 4. Chunk all code
+            chunker = CodeChunker()
 
-        all_chunks = []
+            all_chunks = []
 
-        for code_file in code_files:
+            for code_file in code_files:
 
-            document = chunker.convert_to_document(
-                code_file
+                document = chunker.convert_to_document(
+                    code_file
+                )
+
+                chunks = chunker.code_splitter(
+                    document
+                )
+
+                all_chunks.extend(chunks)
+
+            print("Total chunks:", len(all_chunks))
+
+            # 5. Store chunks in ChromaDB
+            store = ChromaStore()
+
+            store.add_documents(
+                all_chunks
             )
 
-            chunks = chunker.code_splitter(
-                document
+            print(
+                "Stored documents:",
+                store.count()
             )
 
-            all_chunks.extend(chunks)
+            # 6. Repository review
+            code_reviewer = CodeReviewer()
 
-        print("Total chunks:", len(all_chunks))
+            repository_reviewer = RepositoryReviewer(
+                code_reviewer=code_reviewer,
+                vector_store=store,
+                code_files=code_files
+            )
 
-        # 5. Store chunks in ChromaDB
-        store = ChromaStore()
+            reviews = repository_reviewer.review_repository(
+                code_files=code_files,
+                chunks=all_chunks
+            )
 
-        store.add_documents(
-            all_chunks
-        )
+            # 7. Aggregate results
+            aggregator = ReviewAgentAggregator()
 
-        print(
-            "Stored documents:",
-            store.count()
-        )
+            final_result = aggregator.aggregate(
+                reviews
+            )
 
-        # 6. Repository review
-        code_reviewer = CodeReviewer()
+            return final_result
 
-        repository_reviewer = RepositoryReviewer(
-            code_reviewer=code_reviewer,
-            vector_store=store,
-            code_files=code_files
-        )
-
-        reviews = repository_reviewer.review_repository(
-            code_files=code_files,
-            chunks=all_chunks
-        )
-
-        # 7. Aggregate results
-        aggregator = ReviewAgentAggregator()
-
-        final_result = aggregator.aggregate(
-            reviews
-        )
-
-        return final_result
+        finally:
+            loader.cleanup(repo_path)
